@@ -1,10 +1,12 @@
 # KASAMOR MVP — Validation Report
 
-**Date:** 2026-06-16
-**Scope:** Visual + functional validation only. No new features added. Not merged.
+**Date:** 2026-06-16 (updated after coordinate-redaction fix)
+**Scope:** Visual + functional validation, plus the coordinate-redaction hardening
+requested after the first pass. No new product features added. Not merged.
 **Branch:** `claude/tender-knuth-btb2uf`
-**Environment:** API on `:8000`, public interface on `:3000`, internal console on `:3001`
-(both Next.js apps served via `next build && next start`, console wired to the live API).
+**Environment:** API on `:8000`, public interface on `:3000`, internal console on
+`:3001` (both Next.js apps served via `next build && next start`; console wired to
+the live API).
 
 ---
 
@@ -15,23 +17,68 @@
 | Public interface review | ✅ Pass |
 | Internal console review | ✅ Pass |
 | API endpoint verification (8 endpoints) | ✅ Pass |
-| RAG ingestion verification | ✅ Pass (⚠ 1 governance note) |
+| RAG ingestion verification | ✅ Pass |
 | Mock agent pipeline verification | ✅ Pass |
 | Sensitivity gating verification | ✅ Pass (0 leaks) |
-| Public safety scan | ✅ Pass (no public exposure) |
+| Coordinate redaction verification | ✅ Pass (new) |
+| Public safety scan | ✅ Pass |
 | Positioning / language check | ✅ Pass |
 
-**One medium-severity finding** (latent, not a public leak): exact AOI center
-coordinates are embedded in 8 knowledge chunks classified `PARTNER`/`INTERNAL`.
-See §10. Recommended to fix before PR.
+**The medium-severity finding from the first pass (§10.1) is now RESOLVED.**
+All eight `scripts/validate_safety.py` checks pass.
 
 ---
 
-## 2. Public interface review
+## 2. Coordinate-redaction fix (this update)
 
-All five pages render correctly with the intended earth-tone, calm design
-(deep green / sand / charcoal / muted gold), strong typography, and light abstract
-diagrams. No maps, no operational visuals, no gold-rush imagery.
+**Problem (first pass):** exact AOI center coordinates
+(`14.59465389431194, 35.45663416544122`) appeared in 8 knowledge chunks
+classified `PARTNER`/`INTERNAL`, contradicting the governance promise that raw
+coordinates are RESTRICTED.
+
+**Fix:** the ingestion pipeline now redacts coordinate content from chunk text and
+elevates sensitivity automatically.
+
+- New utility `redact_coordinates()` in `scripts/ingest_base_knowledge.py` detects
+  decimal lat/lon pairs, `"lat"/"lon"/"latitude"/"longitude"` JSON fields, GeoJSON
+  `"coordinates"` arrays, KML `<coordinates>` strings, `lookat_*` values, and exact
+  AOI center references.
+- Matches are replaced with `[RESTRICTED_COORDINATE]` or
+  `[PROTECTED_GEOSPATIAL_REFERENCE]`.
+- Any chunk with a redaction is elevated to `RESTRICTED`, or
+  `HOUSE_OF_EARTH_TRUST_ONLY` when linked to private expert/evidence context.
+- Original GeoJSON/KML files are copied to restricted local storage
+  (`data/geo/`, gitignored) and never committed/exposed.
+- New `scripts/validate_safety.py` enforces the guarantees repeatably.
+
+**Outcome of re-ingestion (23 docs / 176 chunks):**
+
+- **16** coordinate references redacted across **9** chunks reclassified.
+- Sensitivity distribution moved from
+  `PARTNER 87 / INTERNAL 87 / RESTRICTED 2`
+  to **`PARTNER 83 / INTERNAL 82 / RESTRICTED 10 / HOUSE_OF_EARTH_TRUST_ONLY 1`**.
+- **0** raw coordinates remain in **any** chunk at **any** level (placeholders only).
+
+Reclassified chunks (all previously PARTNER/INTERNAL):
+
+| Chunk | Source | New level |
+|---|---|---|
+| KSM-KB-0067 | 03 Field Intelligence Protocol | RESTRICTED |
+| KSM-KB-0069/0072/0091/0094 | 04 MVP Study Area | RESTRICTED |
+| KSM-KB-0100 | 05 Technical Blueprint ("expert evidence") | HOUSE_OF_EARTH_TRUST_ONLY |
+| KSM-KB-0106/0107 | 05 Technical Blueprint | RESTRICTED |
+| KSM-KB-0144 | 10 Field Packet Templates | RESTRICTED |
+
+Generalized study-area language (e.g. "approximately 180 km² … Center:
+`[RESTRICTED_COORDINATE]`") is preserved; only the coordinate values are removed.
+
+---
+
+## 3. Public interface review
+
+All five pages render correctly with the intended earth-tone, calm design (deep
+green / sand / charcoal / muted gold), strong typography, light abstract diagrams.
+No maps, no operational visuals, no gold-rush imagery.
 
 | Page | Screenshot | Notes |
 |---|---|---|
@@ -41,40 +88,33 @@ diagrams. No maps, no operational visuals, no gold-rush imagery.
 | MVP | `public/04-mvp.png` | Abstract ~180 km² circle, explicitly "not a map". |
 | Partners | `public/05-partners.png` | Four partner audiences + working principles. |
 
-- Positioning phrase **"Rural Mineral Intelligence"** present on every page
-  (home ×8, others ×4).
+- "Rural Mineral Intelligence" present on every page.
 - Footer on every page states the non-exposure commitment.
-- The interface is **fully static** (renders from `content/site.ts`); it makes **no
-  API calls**, so it has no path to sensitive data.
+- Fully static (renders from `content/site.ts`); **no API calls**, so no path to
+  sensitive data. Public screenshots are unchanged by the fix.
 
-## 3. Internal console review
+## 4. Internal console review
 
-All six routes render and the console reads **live API data** (overview shows
-"Data source: live API", 23 docs / 176 chunks / 2 packets / 2 pending).
+All six routes render and read **live API data**. The knowledge base now correctly
+shows **4 sensitivity levels** post-fix (`02-knowledge-base.png`).
 
 | Page | Screenshot | Notes |
 |---|---|---|
 | Overview | `internal-console/01-overview.png` | Live counts + pipeline description. |
-| Knowledge base | `internal-console/02-knowledge-base.png` | Domain + sensitivity breakdowns. |
-| Knowledge search | `internal-console/08-knowledge-search.png` | Live retrieval with sensitivity badges. |
-| Field packets | `internal-console/03-field-packets.png` | Two packets; "Coordinates are RESTRICTED and never shown here". |
-| Packet detail | `internal-console/04-field-packet-detail.png` | **Location shows "RESTRICTED — not displayed"** despite stored lat/lon. |
-| Review | `internal-console/05-review.png` | Trust review cards, all 6 decision buttons, AI-limitations note. |
+| Knowledge base | `internal-console/02-knowledge-base.png` | **Updated** — PARTNER 83 / INTERNAL 82 / RESTRICTED 10 / HOET 1. |
+| Knowledge search | `internal-console/08-knowledge-search.png` | **Updated** — live retrieval with sensitivity badges. |
+| Field packets | `internal-console/03-field-packets.png` | "Coordinates are RESTRICTED and never shown here". |
+| Packet detail | `internal-console/04-field-packet-detail.png` | Location shows "RESTRICTED — not displayed". |
+| Review | `internal-console/05-review.png` | Trust review cards, all 6 decision buttons. |
 | Reports | `internal-console/06-reports.png` | Selector + generate. |
-| Reports (generated) | `internal-console/07-reports-generated.png` | Live-generated Markdown incl. sensitivity note. |
+| Reports (generated) | `internal-console/07-reports-generated.png` | Live Markdown incl. sensitivity note. |
 
-Functional checks performed in-browser: knowledge search executes and returns
-results; "Generate report" calls the live API and renders Markdown; review decision
-buttons are interactive.
-
-## 4. API endpoint verification
-
-Tested against the live server (`http://localhost:8000`):
+## 5. API endpoint verification (live, post-fix)
 
 | Endpoint | Result |
 |---|---|
 | `GET /health` | 200 |
-| `GET /knowledge/summary` | 200 (176 chunks) |
+| `GET /knowledge/summary` | 200 (176 chunks; 4 sensitivity levels) |
 | `POST /knowledge/search` | 200 |
 | `GET /field-packets` | 200 (2) |
 | `GET /field-packets/{id}` | 200 |
@@ -82,130 +122,105 @@ Tested against the live server (`http://localhost:8000`):
 | `POST /agents/run/mock` | 200 (5 steps) |
 | `POST /reports/field-packet/{id}` | 200 |
 
-Input validation confirmed: `top_k > 25` is rejected with **422** (Pydantic bound),
-i.e. the API guards against oversized requests.
+`top_k > 25` → 422 (Pydantic bound enforced).
 
-## 5. RAG ingestion verification
+## 6. RAG ingestion verification
 
-- Outputs present: `knowledge_chunks.jsonl`, `document_registry.json`,
+- Outputs regenerated: `knowledge_chunks.jsonl`, `document_registry.json`,
   `knowledge_index_summary.md`.
-- **23 documents → 176 chunks.**
-- All chunks carry the schema-required fields
-  (`chunk_id`, `source_file`, `content`, `sensitivity_level`, `knowledge_domain`).
-- Sensitivity distribution: `PARTNER` 87 · `INTERNAL` 87 · `RESTRICTED` 2.
-- ⚠ 8 chunks contain coordinate-like numbers carried over from the source DOCX
-  prose — see §10.
+- **23 documents → 176 chunks.** All chunks carry the schema-required fields.
+- Registry now records `redacted_coordinate_refs` (16) and `reclassified_chunks` (9).
+- **0** raw coordinates in chunk content (verified across all levels).
 
-## 6. Mock agent pipeline verification
+## 7. Mock agent pipeline verification
 
-`scripts/run_mock_agent_pipeline.py` and `POST /agents/run/mock` both run the full
-five-stage pipeline (intake → photo quality → voice-to-knowledge → fusion → Trust
-review card) and produce a Markdown report at
-`data/outputs/reports/KSM-FP-0001_report.md`. Mode reported as `mock`; no API keys
-required. AI limitations and `needs_human_review` are present in every output.
+`scripts/run_mock_agent_pipeline.py` and `POST /agents/run/mock` run the full
+five-stage pipeline and write `data/outputs/reports/KSM-FP-0001_report.md`. Mode
+`mock`, no keys. AI limitations and `needs_human_review` present in every output.
 
-## 7. Sensitivity gating verification
+## 8. Sensitivity gating verification (post-fix)
 
-Search executed at each clearance with an aggressive query
-("trust governance field gold sediment"):
+Query: "center latitude longitude coordinates gps geojson" (designed to surface any
+coordinate content):
 
-| Clearance | Results | Over-clearance leaks |
-|---|---|---|
-| PUBLIC | 0 | 0 |
-| PARTNER | 25 | 0 |
-| INTERNAL | 25 | 0 |
+| Clearance | Results | Over-clearance leaks | Raw coords in snippet |
+|---|---|---|---|
+| PUBLIC | 0 | 0 | 0 |
+| PARTNER | 24 | 0 | 0 |
+| INTERNAL | 25 | 0 | 0 |
 
-A caller never receives chunks above their clearance. PUBLIC returns **0** because
-there are **no PUBLIC chunks** — a fail-safe default.
+No caller receives chunks above clearance, and **no coordinate appears in any
+returned snippet**.
 
-## 8. Public safety scan
+## 9. Coordinate-redaction validation (`scripts/validate_safety.py`)
 
-Scan of the **live-served public HTML** for all five pages:
+```
+[PASS] 0 exact coordinates in PUBLIC chunks
+[PASS] 0 exact coordinates in PARTNER chunks
+[PASS] 0 exact coordinates in INTERNAL chunks
+[PASS] all raw-coordinate content is restricted (none in PUBLIC/PARTNER/INTERNAL)
+[PASS] redaction applied (refs=16, chunks_with_placeholder=9)
+[PASS] geospatial-derived chunks contain no raw coordinates
+[PASS] public interface source: no coordinates or field-packet data
+[PASS] restricted geospatial originals preserved locally only (2 file(s), gitignored)
+RESULT: ALL PASS
+```
 
-- Exact coordinates (`35.45x` / `14.59x` / `lookat_`): **none**.
+## 10. Public safety scan (served HTML)
+
+Scan of the live-served public HTML for all five pages:
+
+- Exact coordinates / `lookat_`: **none**.
 - Field-packet / contributor / photo / voice ids: **none**.
 - GeoJSON / KML / FeatureCollection references: **none**.
-- Forbidden terms: only `"target map"` appears — exclusively in the safety negation
-  **"not a target map"** (verified in context). No gold-detection, prospecting,
-  guaranteed, reserve-estimate, or extraction-instruction language.
+- Forbidden terms: only `"target map"` — exclusively in the negation "not a target
+  map". No gold-detection, prospecting, guaranteed, reserve-estimate, or
+  extraction-instruction language.
 
-## 9. Positioning / language check
+## 11. Positioning / language check
 
 - "Rural Mineral Intelligence" present on all public pages.
 - No "mining dashboard", "prospecting tool", or "gold map" anywhere.
-- Narrative consistently frames KASAMOR as a **Rural Mineral Intelligence
-  Ecosystem** with the House of Earth Trust as the review/protection layer — not a
-  gold map, mining dashboard, or public prospecting tool.
+- KASAMOR consistently framed as a **Rural Mineral Intelligence Ecosystem** with
+  the House of Earth Trust as the review/protection layer — not a gold map, mining
+  dashboard, or public prospecting tool.
 
-## 10. Issues found
+## 12. Issues
 
-### 10.1 (MEDIUM) Exact AOI coordinates embedded in PARTNER/INTERNAL chunks
-The precise study-area center `14.59465389431194, 35.45663416544122` (and JSON
-samples containing it) appears in **8 chunks**:
+### 12.1 (RESOLVED) Exact AOI coordinates in PARTNER/INTERNAL chunks
+Fixed by automatic coordinate redaction + sensitivity elevation at ingestion
+(§2). Re-verified: 0 raw coordinates in any PUBLIC/PARTNER/INTERNAL chunk.
 
-- `KSM-KB-0069/0072/0091/0094` — source `04_..._MVP_Study_Area...docx` — **PARTNER**
-- `KSM-KB-0100/0106/0107` — source `05_..._Technical_AI_Agent...docx` — **INTERNAL**
-- `KSM-KB-0144` — source `10_..._Field_Packet_Templates...docx` — **INTERNAL**
+### 12.2 (LOW / INFO) `top_k > 25` returns 422
+Not a bug — Pydantic bound. Documented for consumers.
 
-The ingestion classifies a chunk by its **source document's default sensitivity**.
-Geospatial *files* are correctly downgraded to RESTRICTED descriptors, but
-coordinates written **in prose / sample JSON inside the DOCX bodies** inherit the
-document default (PARTNER for doc 04).
+### 12.3 (LOW) Review decisions are not persisted
+MVP by design (noted in UI).
 
-**Impact today:** none publicly. The public interface has no API path, PUBLIC
-clearance returns 0 chunks, and the console hides location. **Latent risk:** the
-data-governance policy promises raw coordinates are RESTRICTED; a future
-PARTNER-tier surface could surface these.
+## 13. Known limitations (unchanged)
 
-**Severity:** Medium (governance/defense-in-depth, not an active public leak).
-
-### 10.2 (LOW / INFO) `top_k > 25` returns 422
-Not a bug — Pydantic correctly enforces the bound. Documented here so consumers
-set `top_k ≤ 25`.
-
-### 10.3 (LOW) Review decisions are not persisted
-By design for the MVP (noted in the UI). Listed for completeness.
-
-## 11. Known limitations (unchanged from build)
-
-- AI agents, image vision, and voice transcription are deterministic **mocks**.
-- Retrieval is keyword-based over JSONL (no embeddings / vector DB).
+- AI agents, image vision, voice transcription are deterministic **mocks**.
+- Retrieval is keyword-based over JSONL (no vector DB).
 - Storage is local JSON (no PostgreSQL/PostGIS).
 - No authentication / role-based access control.
-- Console review decisions are demo-only (not persisted).
+- Console review decisions are demo-only.
 
-## 12. Recommended fixes before PR
+## 14. Acceptance criteria
 
-1. **(Medium) Coordinate guard in ingestion** — detect lat/lon patterns in chunk
-   `content` and either (a) redact them, or (b) force-elevate the chunk to
-   `RESTRICTED`, regardless of the source document default. This closes the gap in
-   §10.1 and makes the governance promise true by construction. *(Deferred — would
-   be a code change; flagged for approval, not done in this validation pass.)*
-2. **(Low) Document the `top_k ≤ 25` bound** in `services/api/README.md` and the
-   console search hint.
-3. **(Optional) Add `data/outputs/` to validation artifacts** or keep gitignored —
-   confirm intended behaviour before PR.
+**13 / 13 still met** (see `docs/mvp-roadmap.md`). The redaction fix strengthens
+criteria 11–12 (no sensitive data exposed) without changing any feature behaviour.
 
-## 13. Generated screenshots
+## 15. Generated screenshots
 
 ```
 docs/screenshots/public/
-  01-homepage.png
-  02-ecosystem.png
-  03-how-it-works.png
-  04-mvp.png
-  05-partners.png
+  01-homepage.png  02-ecosystem.png  03-how-it-works.png  04-mvp.png  05-partners.png
 docs/screenshots/internal-console/
-  01-overview.png
-  02-knowledge-base.png
-  03-field-packets.png
-  04-field-packet-detail.png
-  05-review.png
-  06-reports.png
-  07-reports-generated.png      (functional: live Markdown report)
-  08-knowledge-search.png       (functional: live retrieval results)
+  01-overview.png  02-knowledge-base.png*  03-field-packets.png  04-field-packet-detail.png
+  05-review.png  06-reports.png  07-reports-generated.png  08-knowledge-search.png*
+  (* regenerated after the redaction fix)
 ```
 
 **Verdict:** The MVP is visually and functionally sound and safe for public
-exposure as built. One medium-severity governance hardening (§10.1) is recommended
-before opening the PR.
+exposure. The medium-severity coordinate finding is resolved and enforced by an
+automated check. **The PR is ready to open pending your review of this report.**

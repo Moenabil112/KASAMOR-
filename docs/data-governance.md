@@ -51,6 +51,30 @@ only**. Raw coordinates are never written into retrievable knowledge chunks or a
 public output. The public interface communicates the study area as an *approximate
 scale* (~180 km²), never as a map with points.
 
+### Automatic coordinate redaction (enforced at ingestion)
+
+The ingestion pipeline (`scripts/ingest_base_knowledge.py`,
+`redact_coordinates()`) detects and redacts coordinate content found in document
+**prose and sample JSON**, not just in standalone geospatial files:
+
+- decimal latitude/longitude pairs (e.g. `14.594…, 35.456…`)
+- `"lat"` / `"lon"` / `"latitude"` / `"longitude"` JSON fields
+- GeoJSON `"coordinates": [...]` arrays
+- KML `<coordinates>…</coordinates>` strings and `lookat_*` values
+- exact AOI center references
+
+Matches are replaced with `[RESTRICTED_COORDINATE]` or
+`[PROTECTED_GEOSPATIAL_REFERENCE]`, and the owning chunk is **sensitivity-elevated**
+to `RESTRICTED` — or `HOUSE_OF_EARTH_TRUST_ONLY` when linked to private
+expert/evidence context. As a result, **no exact coordinate ever appears in a
+PUBLIC, PARTNER, or INTERNAL chunk.** Generalized study-area language
+("approximately 180 km² pilot area", "study area derived from protected geospatial
+references") is preserved.
+
+The original GeoJSON/KML files are preserved only in restricted local storage
+(`data/geo/`, gitignored) and are never committed or exposed through any surface.
+`scripts/validate_safety.py` verifies these guarantees on every run.
+
 ## AI limitations & human review
 
 - AI output is **assistive and indicative**. It never confirms the presence or

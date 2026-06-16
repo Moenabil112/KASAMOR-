@@ -90,6 +90,92 @@ def _estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+# --------------------------------------------------------------------------- #
+# Coordinate redaction
+#
+# Raw latitude/longitude values, GeoJSON coordinate arrays, KML coordinate
+# strings, and exact AOI center references must never reach PUBLIC / PARTNER /
+# INTERNAL knowledge chunks. This utility detects such content, replaces it with
+# a safe placeholder, and signals that the owning chunk must be sensitivity-
+# elevated to RESTRICTED (or HOUSE_OF_EARTH_TRUST_ONLY for private expert/evidence
+# context).
+# --------------------------------------------------------------------------- #
+RESTRICTED_COORDINATE = "[RESTRICTED_COORDINATE]"
+PROTECTED_GEOSPATIAL_REFERENCE = "[PROTECTED_GEOSPATIAL_REFERENCE]"
+
+# High-precision decimal that looks like a coordinate component (4+ decimals).
+_DEC = r"-?\d{1,3}\.\d{4,}"
+
+_GEOJSON_COORDS = re.compile(r'"coordinates"\s*:\s*\[[\s\S]*?\]', re.IGNORECASE)
+_KML_COORDS = re.compile(r"<coordinates>[\s\S]*?</coordinates>", re.IGNORECASE)
+_LOOKAT = re.compile(
+    r"(lookat_(?:longitude|latitude|altitude|range|heading|tilt))\s*[:=]?\s*-?\d+\.\d+",
+    re.IGNORECASE,
+)
+_JSON_LATLON = re.compile(
+    r'"(lat|lon|latitude|longitude|center_longitude|center_latitude)"\s*:\s*-?\d+\.\d+',
+    re.IGNORECASE,
+)
+_PROSE_PAIR = re.compile(rf"{_DEC}\s*,\s*{_DEC}")
+_LATLON_WORDS = re.compile(rf"(lat(?:itude)?|lon(?:gitude)?)\s+({_DEC})", re.IGNORECASE)
+_BARE_HIGHPREC = re.compile(_DEC)
+
+# Coordinate context cue — only then do we redact remaining bare high-precision
+# decimals, to avoid touching unrelated numeric figures.
+_COORD_CONTEXT = re.compile(
+    r"coordinate|latitude|longitude|\baoi\b|geojson|\bkml\b|\bcenter\b|\blat\b|\blon\b|crs84",
+    re.IGNORECASE,
+)
+
+# Private expert / evidence context -> HOUSE_OF_EARTH_TRUST_ONLY rather than RESTRICTED.
+_EXPERT_CONTEXT = re.compile(
+    r"private research|evidence register|protected research|expert evidence|geological memory",
+    re.IGNORECASE,
+)
+
+
+def redact_coordinates(text: str) -> tuple[str, int, bool]:
+    """Redact coordinate-like content from `text`.
+
+    Returns (redacted_text, redaction_count, used_protected_geospatial).
+    """
+    count = 0
+    protected_geo = False
+
+    def _sub(pattern: re.Pattern, repl, s: str) -> str:
+        nonlocal count
+        new, n = pattern.subn(repl, s)
+        count += n
+        return new
+
+    out = text
+
+    # Structural geospatial -> PROTECTED_GEOSPATIAL_REFERENCE.
+    if _GEOJSON_COORDS.search(out) or _KML_COORDS.search(out):
+        protected_geo = True
+    out = _sub(_GEOJSON_COORDS, f'"coordinates": {PROTECTED_GEOSPATIAL_REFERENCE}', out)
+    out = _sub(_KML_COORDS, f"<coordinates>{PROTECTED_GEOSPATIAL_REFERENCE}</coordinates>", out)
+    out = _sub(_LOOKAT, lambda m: f"{m.group(1)}: {PROTECTED_GEOSPATIAL_REFERENCE}", out)
+
+    # JSON lat/lon fields and prose pairs -> RESTRICTED_COORDINATE.
+    out = _sub(_JSON_LATLON, lambda m: f'"{m.group(1)}": {RESTRICTED_COORDINATE}', out)
+    out = _sub(_PROSE_PAIR, RESTRICTED_COORDINATE, out)
+    out = _sub(_LATLON_WORDS, lambda m: f"{m.group(1)} {RESTRICTED_COORDINATE}", out)
+
+    # Remaining bare high-precision decimals, only in clear coordinate context.
+    if _COORD_CONTEXT.search(text):
+        out = _sub(_BARE_HIGHPREC, RESTRICTED_COORDINATE, out)
+
+    return out, count, protected_geo
+
+
+def elevated_level_for(text: str, document_type: str) -> str:
+    """Sensitivity level a coordinate-bearing chunk must be elevated to."""
+    if document_type == "trust_operating_model" or _EXPERT_CONTEXT.search(text):
+        return "HOUSE_OF_EARTH_TRUST_ONLY"
+    return "RESTRICTED"
+
+
 def extract_docx_text(path: Path) -> str:
     """Read paragraph text from a .docx without third-party libraries."""
     try:
@@ -184,6 +270,8 @@ def ingest(base: Path) -> tuple[list[dict], list[dict]]:
     chunks: list[dict] = []
     registry: list[dict] = []
     counter = 0
+    total_redactions = 0
+    total_reclassified = 0
 
     for path in iter_files(base):
         rel = path.relative_to(base).as_posix()
@@ -215,12 +303,15 @@ def ingest(base: Path) -> tuple[list[dict], list[dict]]:
             entry["knowledge_domain"] = "geospatial"
             entry["sensitivity_level"] = "RESTRICTED"
             text = (
-                f"Geospatial reference file: {path.name}. "
-                "Contains the MVP study-area extent / center reference. "
-                "Exact coordinates are RESTRICTED and are never exposed publicly."
+                f"Geospatial reference: {path.name}. Describes the controlled MVP "
+                "study area (approximately 180 km2 pilot zone) derived from "
+                "protected geospatial references. Exact coordinates are held in "
+                "restricted storage only and are never exposed through public, "
+                "partner, or general knowledge surfaces."
             )
-            # Copy a sanitized note to data/geo for internal use.
+            # Preserve the ORIGINAL coordinate file only in restricted storage.
             GEO_DIR.mkdir(parents=True, exist_ok=True)
+            _preserve_restricted_geospatial(path)
         elif suffix in (".png", ".jpg", ".jpeg"):
             entry["document_type"] = "figure"
             entry["knowledge_domain"] = "technical"
@@ -234,30 +325,70 @@ def ingest(base: Path) -> tuple[list[dict], list[dict]]:
 
         # Chunk text content.
         produced = 0
+        doc_redactions = 0
+        doc_reclassified = 0
         for section_title, body in split_into_sections(text):
             for piece in chunk_section(body):
                 counter += 1
+                sensitivity = entry["sensitivity_level"]
+
+                # Redact any coordinate-like content and elevate sensitivity.
+                content, n_redacted, _ = redact_coordinates(piece)
+                if n_redacted:
+                    elevated = elevated_level_for(piece, entry["document_type"])
+                    if elevated != sensitivity:
+                        doc_reclassified += 1
+                        total_reclassified += 1
+                    sensitivity = elevated
+                    doc_redactions += n_redacted
+                    total_redactions += n_redacted
+
                 chunk = {
                     "chunk_id": f"KSM-KB-{counter:04d}",
                     "source_file": rel,
                     "document_type": entry["document_type"],
                     "section_title": section_title[:160],
-                    "content": piece,
-                    "sensitivity_level": entry["sensitivity_level"],
+                    "content": content,
+                    "sensitivity_level": sensitivity,
                     "knowledge_domain": entry["knowledge_domain"],
-                    "token_estimate": _estimate_tokens(piece),
+                    "token_estimate": _estimate_tokens(content),
                     "created_at": _now(),
-                    "needs_human_review": entry["sensitivity_level"]
-                    in ("RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"),
+                    "redacted_coordinate_refs": n_redacted,
+                    "needs_human_review": (
+                        sensitivity in ("RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY")
+                        or n_redacted > 0
+                    ),
                 }
                 chunks.append(chunk)
                 produced += 1
 
         entry["chunk_count"] = produced
+        entry["redacted_coordinate_refs"] = doc_redactions
+        entry["reclassified_chunks"] = doc_reclassified
         registry.append(entry)
-        print(f"[ingest] {rel:60s} {entry['file_type']:8s} chunks={produced}")
+        flag = f" redacted={doc_redactions} reclassified={doc_reclassified}" if doc_redactions else ""
+        print(f"[ingest] {rel:60s} {entry['file_type']:8s} chunks={produced}{flag}")
 
+    print(
+        f"[ingest] coordinate redaction: {total_redactions} reference(s) redacted, "
+        f"{total_reclassified} chunk(s) reclassified."
+    )
     return chunks, registry
+
+
+def _preserve_restricted_geospatial(path: Path) -> None:
+    """Copy an original GeoJSON/KML file into restricted storage (data/geo/).
+
+    data/geo/ is gitignored, so raw coordinates live only in restricted local
+    storage and are never committed or exposed through any knowledge surface.
+    """
+    import shutil
+
+    target = GEO_DIR / path.name
+    try:
+        shutil.copy2(path, target)
+    except OSError:
+        pass
 
 
 def write_outputs(chunks: list[dict], registry: list[dict]) -> None:
@@ -270,12 +401,16 @@ def write_outputs(chunks: list[dict], registry: list[dict]) -> None:
             fh.write(json.dumps(c, ensure_ascii=False) + "\n")
 
     # 2. Document registry
+    total_redacted = sum(d.get("redacted_coordinate_refs", 0) for d in registry)
+    total_reclassified = sum(d.get("reclassified_chunks", 0) for d in registry)
     (EXTRACTED_DIR / "document_registry.json").write_text(
         json.dumps(
             {
                 "generated_at": _now(),
                 "document_count": len(registry),
                 "chunk_count": len(chunks),
+                "redacted_coordinate_refs": total_redacted,
+                "reclassified_chunks": total_reclassified,
                 "documents": registry,
             },
             ensure_ascii=False,
@@ -303,6 +438,8 @@ def write_outputs(chunks: list[dict], registry: list[dict]) -> None:
         "",
         f"- **Documents ingested:** {len(registry)}",
         f"- **Knowledge chunks:** {len(chunks)}",
+        f"- **Coordinate references redacted:** {total_redacted}",
+        f"- **Chunks reclassified by redaction:** {total_reclassified}",
         "",
         "## Chunks by knowledge domain",
         "",
@@ -329,8 +466,15 @@ def write_outputs(chunks: list[dict], registry: list[dict]) -> None:
         )
     lines += [
         "",
-        "> Note: geospatial files are indexed as RESTRICTED descriptors only. "
-        "Raw coordinates are never written to public-facing outputs.",
+        "> Note: geospatial files are indexed as RESTRICTED descriptors only, and "
+        "their original coordinate files are preserved exclusively in restricted "
+        "storage (`data/geo/`, gitignored). Any latitude/longitude values, GeoJSON "
+        "coordinate arrays, KML coordinate strings, or AOI center references found "
+        "in document prose are automatically redacted to "
+        "`[RESTRICTED_COORDINATE]` / `[PROTECTED_GEOSPATIAL_REFERENCE]` and the "
+        "owning chunk is elevated to RESTRICTED (or HOUSE_OF_EARTH_TRUST_ONLY for "
+        "private expert/evidence context). Raw coordinates are never written to "
+        "PUBLIC, PARTNER, or INTERNAL chunks.",
         "",
     ]
     (EXTRACTED_DIR / "knowledge_index_summary.md").write_text(
