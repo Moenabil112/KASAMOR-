@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-earth-sandlight text-earth-charcoal antialiased;
+}
+
+.section {
+  @apply mx-auto max-w-5xl px-6 py-16;
+}
+
+.eyebrow {
+  @apply text-xs font-semibold uppercase tracking-[0.2em] text-earth-goldmuted;
+}
+
+.lead {
+  @apply text-lg leading-relaxed text-earth-charcoal/80;
+}
+
+.card {
+  @apply rounded-xl border border-earth-sand bg-white/70 p-6 shadow-sm;
+}
