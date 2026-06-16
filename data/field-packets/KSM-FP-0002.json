@@ -1,0 +1,35 @@
+{
+  "field_packet_id": "KSM-FP-0002",
+  "contributor_code": "FIELD-002",
+  "location": {
+    "lat": 14.5901,
+    "lon": 35.4602,
+    "accuracy_m": 12,
+    "sensitivity_level": "RESTRICTED"
+  },
+  "place_label": "Lower drainage fan, eastern sector",
+  "observation_date": "2026-06-16",
+  "seasonal_context": "dry_season",
+  "photos": [],
+  "voice_notes": [],
+  "local_notes": [
+    "Dry channel now; contributor recalls flow last season."
+  ],
+  "sediment_observations": [
+    "Pale sand dominant; little dark material visible when dry."
+  ],
+  "rock_observations": [
+    "Scattered weathered rock along the fan edge."
+  ],
+  "water_drainage_observations": [
+    "Broad shallow fan; no active flow at visit."
+  ],
+  "observation_tags": [
+    "dry_season",
+    "drainage_fan"
+  ],
+  "ai_summary": null,
+  "review_status": "pending",
+  "review_decision": null,
+  "created_at": "2026-06-16T09:35:12Z"
+}
