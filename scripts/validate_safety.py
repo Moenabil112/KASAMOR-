@@ -14,6 +14,7 @@ Usage:
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import sys
@@ -22,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CHUNKS = ROOT / "data" / "extracted-knowledge" / "knowledge_chunks.jsonl"
 PUBLIC_CONTENT = ROOT / "apps" / "public-interface"
+INGEST_SCRIPT = ROOT / "scripts" / "ingest_base_knowledge.py"
 
 # Raw-coordinate detectors (what must NOT appear in non-restricted content).
 AOI_NUMBERS = re.compile(r"35\.456\d|14\.594\d")
@@ -45,10 +47,54 @@ def load_chunks() -> list[dict]:
     return [json.loads(l) for l in CHUNKS.open(encoding="utf-8") if l.strip()]
 
 
-def main() -> int:
+def _load_redaction():
+    """Load redact_coordinates/elevated_level_for from the ingestion script."""
+    spec = importlib.util.spec_from_file_location("kasamor_ingest_safety", INGEST_SCRIPT)
+    module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    assert spec and spec.loader
+    spec.loader.exec_module(module)
+    return module
+
+
+def redaction_selftest() -> list[tuple[str, bool, str]]:
+    """Prove the redaction mechanism strips every coordinate form and elevates
+    sensitivity. Runs with NO knowledge corpus, so CI enforces the coordinate
+    guarantee by construction even on a fresh checkout (chunks are gitignored).
+    """
+    mod = _load_redaction()
     results: list[tuple[str, bool, str]] = []
 
-    chunks = load_chunks()
+    samples = {
+        "prose lat/lon pair": "Center: 14.59465389431194, 35.45663416544122 (lat, lon)",
+        "json lat/lon fields": '{"lat": 14.59465, "lon": 35.45663, "accuracy_m": 8}',
+        "geojson coordinates array": '"geometry": {"coordinates": [35.45663, 14.59465]}',
+        "kml coordinates string": "<coordinates>35.45663,14.59465,649</coordinates>",
+        "latitude/longitude words": "at latitude 14.5946539 longitude 35.4566342 today",
+    }
+    for label, text in samples.items():
+        redacted, count, _ = mod.redact_coordinates(text)
+        ok = count > 0 and not has_raw_coords(redacted)
+        detail = "" if ok else f"count={count} redacted={redacted!r}"
+        results.append((f"redaction self-test: {label}", ok, detail))
+
+    # Sensitivity elevation rules.
+    generic = mod.elevated_level_for("center latitude longitude", "technical_blueprint")
+    results.append(
+        ("redaction self-test: generic coord chunk -> RESTRICTED",
+         generic == "RESTRICTED", f"got {generic}")
+    )
+    expert = mod.elevated_level_for(
+        "private research and expert evidence at latitude", "trust_operating_model"
+    )
+    results.append(
+        ("redaction self-test: expert/evidence coord chunk -> HOUSE_OF_EARTH_TRUST_ONLY",
+         expert == "HOUSE_OF_EARTH_TRUST_ONLY", f"got {expert}")
+    )
+    return results
+
+
+def chunk_checks(chunks: list[dict]) -> list[tuple[str, bool, str]]:
+    results: list[tuple[str, bool, str]] = []
 
     # 1-3. No raw coordinates in PUBLIC / PARTNER / INTERNAL chunks.
     for level in ["PUBLIC", "PARTNER", "INTERNAL"]:
@@ -96,6 +142,26 @@ def main() -> int:
         ("geospatial-derived chunks contain no raw coordinates",
          not geo_offenders, ",".join(geo_offenders))
     )
+    return results
+
+
+def main() -> int:
+    results: list[tuple[str, bool, str]] = []
+    notes: list[str] = []
+
+    # Always exercise the redaction mechanism (works without the corpus).
+    results.extend(redaction_selftest())
+
+    # Chunk-level checks only when the ingested corpus is present (it is
+    # gitignored, so a fresh CI checkout will not have it).
+    if CHUNKS.exists():
+        results.extend(chunk_checks(load_chunks()))
+    else:
+        notes.append(
+            "knowledge_chunks.jsonl not present (expected on a fresh/CI checkout) — "
+            "coordinate guarantee enforced via the redaction self-test above; run "
+            "scripts/ingest_base_knowledge.py to enable full chunk-level checks."
+        )
 
     # 7. Public interface source is coordinate-free and exposes no field data.
     pub_offenders: list[str] = []
@@ -132,6 +198,8 @@ def main() -> int:
         if detail and not ok:
             line += f"  -> {detail}"
         print(line)
+    for note in notes:
+        print(f"[INFO] {note}")
     print("=" * 60)
     print("RESULT:", "ALL PASS" if all_ok else "FAILURES PRESENT")
     return 0 if all_ok else 1
