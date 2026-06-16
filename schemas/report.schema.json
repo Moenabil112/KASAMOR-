@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/report.schema.json",
+  "title": "KASAMOR Field Packet Report",
+  "description": "Structured, report-ready output summarising a Field Packet for human review.",
+  "type": "object",
+  "required": ["report_id", "field_packet_id", "generated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "report_id": { "type": "string", "pattern": "^KSM-RP-[0-9]{4,}$" },
+    "field_packet_id": { "type": "string", "pattern": "^KSM-FP-[0-9]{4,}$" },
+    "contributor_code": { "type": ["string", "null"] },
+    "place_label": { "type": ["string", "null"] },
+    "observation_date": { "type": ["string", "null"] },
+    "data_included": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "photo_quality_summary": { "type": ["string", "null"] },
+    "voice_observation_summary": { "type": ["string", "null"] },
+    "ai_summary": { "type": ["string", "null"] },
+    "human_review_status": { "type": ["string", "null"] },
+    "recommended_next_action": { "type": ["string", "null"] },
+    "sensitivity_note": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "format": { "type": "string", "enum": ["markdown"], "default": "markdown" }
+  }
+}

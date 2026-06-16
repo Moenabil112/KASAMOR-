@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/photo_metadata.schema.json",
+  "title": "KASAMOR Photo Metadata",
+  "description": "Metadata and quality assessment for a single field photo. Never asserts mineral identification.",
+  "type": "object",
+  "required": ["photo_id", "field_packet_id", "photo_type", "quality_status"],
+  "additionalProperties": false,
+  "properties": {
+    "photo_id": { "type": "string", "pattern": "^KSM-PH-[0-9]{4,}$" },
+    "field_packet_id": { "type": "string", "pattern": "^KSM-FP-[0-9]{4,}$" },
+    "photo_type": {
+      "type": "string",
+      "enum": [
+        "site_context",
+        "upstream_view",
+        "downstream_view",
+        "trap_closeup",
+        "sediment_before",
+        "sediment_closeup",
+        "sediment_after_wash",
+        "black_sand_closeup",
+        "magnet_test",
+        "quartz_fragment",
+        "bedrock_crack",
+        "rock_context",
+        "vegetation_context",
+        "sample_id",
+        "other"
+      ]
+    },
+    "quality_status": {
+      "type": "string",
+      "enum": ["accepted", "documentation_only", "needs_retake", "rejected"]
+    },
+    "quality_notes": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "has_reference_scale": { "type": "boolean", "default": false },
+    "has_gps": { "type": "boolean", "default": false },
+    "is_blurry": { "type": "boolean", "default": false },
+    "lighting_condition": { "type": "string", "enum": ["good", "poor", "unknown"], "default": "unknown" },
+    "ai_confidence": { "type": "string", "enum": ["low", "medium", "high"], "default": "low" },
+    "sensitivity_level": {
+      "type": "string",
+      "enum": ["PUBLIC", "PARTNER", "INTERNAL", "RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"],
+      "default": "RESTRICTED"
+    }
+  }
+}

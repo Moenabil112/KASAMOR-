@@ -1,0 +1,57 @@
+# =============================================================================
+# KASAMOR Platform — docker-compose (MVP convenience)
+#
+# NOTE: The first local demo does NOT require Docker or any database.
+# This file is provided for convenience and to document the intended
+# service topology. The `db` service is commented out on purpose — the MVP
+# uses local JSON/JSONL storage and does not require Postgres/PostGIS.
+# =============================================================================
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: kasamor/api:dev
+    environment:
+      - KASAMOR_API_HOST=0.0.0.0
+      - KASAMOR_API_PORT=8000
+      - KASAMOR_AGENT_MODE=mock
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+
+  public-interface:
+    build:
+      context: ./apps/public-interface
+    image: kasamor/public-interface:dev
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+
+  internal-console:
+    build:
+      context: ./apps/internal-console
+    image: kasamor/internal-console:dev
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    ports:
+      - "3001:3000"
+
+  # --- Optional, NOT required for the MVP demo ---
+  # db:
+  #   image: postgis/postgis:16-3.4
+  #   environment:
+  #     - POSTGRES_USER=kasamor
+  #     - POSTGRES_PASSWORD=kasamor
+  #     - POSTGRES_DB=kasamor
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - kasamor_pgdata:/var/lib/postgresql/data
+
+# volumes:
+#   kasamor_pgdata:

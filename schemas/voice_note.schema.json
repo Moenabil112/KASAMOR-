@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/voice_note.schema.json",
+  "title": "KASAMOR Voice Note",
+  "description": "A field voice note and its structured field-knowledge extraction.",
+  "type": "object",
+  "required": ["voice_note_id", "field_packet_id"],
+  "additionalProperties": false,
+  "properties": {
+    "voice_note_id": { "type": "string", "pattern": "^KSM-VN-[0-9]{4,}$" },
+    "field_packet_id": { "type": "string", "pattern": "^KSM-FP-[0-9]{4,}$" },
+    "language_or_dialect": {
+      "type": "string",
+      "enum": ["local_dialect", "arabic", "english", "unknown"],
+      "default": "unknown"
+    },
+    "transcription_status": {
+      "type": "string",
+      "enum": ["pending", "transcribed", "failed"],
+      "default": "pending"
+    },
+    "transcript": { "type": ["string", "null"], "default": null },
+    "structured_observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seasonal_flow": { "type": ["string", "boolean", "null"], "default": null },
+        "black_sand_after_flow": { "type": ["string", "boolean", "null"], "default": null },
+        "upstream_white_rocks": { "type": ["string", "boolean", "null"], "default": null },
+        "persistent_vegetation": { "type": ["string", "boolean", "null"], "default": null },
+        "local_confidence": { "type": "string", "enum": ["low", "medium", "high", "unknown"], "default": "unknown" }
+      }
+    },
+    "follow_up_question": { "type": ["string", "null"], "default": null },
+    "sensitivity_level": {
+      "type": "string",
+      "enum": ["PUBLIC", "PARTNER", "INTERNAL", "RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"],
+      "default": "RESTRICTED"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "voice_note_id": "KSM-VN-0001",
+    "field_packet_id": "KSM-FP-0001",
+    "language_or_dialect": "local_dialect",
+    "transcription_status": "pending",
+    "transcript": null,
+    "structured_observations": {
+      "seasonal_flow": null,
+      "black_sand_after_flow": null,
+      "upstream_white_rocks": null,
+      "persistent_vegetation": null,
+      "local_confidence": "unknown"
+    },
+    "follow_up_question": null,
+    "sensitivity_level": "RESTRICTED"
+  }
+]

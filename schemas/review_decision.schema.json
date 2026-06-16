@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/review_decision.schema.json",
+  "title": "KASAMOR House of Earth Trust Review Decision",
+  "description": "A human review decision recorded by the House of Earth Trust for a Field Packet.",
+  "type": "object",
+  "required": ["review_id", "field_packet_id", "decision"],
+  "additionalProperties": false,
+  "properties": {
+    "review_id": { "type": "string", "pattern": "^KSM-RV-[0-9]{4,}$" },
+    "field_packet_id": { "type": "string", "pattern": "^KSM-FP-[0-9]{4,}$" },
+    "reviewer_code": { "type": ["string", "null"], "description": "Anonymous reviewer code." },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "needs_more_photos",
+        "needs_field_revisit",
+        "needs_sample",
+        "low_priority",
+        "rejected"
+      ]
+    },
+    "rationale": { "type": ["string", "null"], "default": null },
+    "ai_limitations_acknowledged": { "type": "boolean", "default": false },
+    "decided_at": { "type": ["string", "null"], "default": null },
+    "sensitivity_level": {
+      "type": "string",
+      "enum": ["PUBLIC", "PARTNER", "INTERNAL", "RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"],
+      "default": "HOUSE_OF_EARTH_TRUST_ONLY"
+    }
+  }
+}

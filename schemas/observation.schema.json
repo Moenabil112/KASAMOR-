@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/observation.schema.json",
+  "title": "KASAMOR Observation Intelligence Summary",
+  "description": "A fused, AI-assisted observation summary combining location, photo, voice and base knowledge. Indicative only — never a confirmed mineral claim.",
+  "type": "object",
+  "required": ["observation_id", "field_packet_id", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "observation_id": { "type": "string", "pattern": "^KSM-OB-[0-9]{4,}$" },
+    "field_packet_id": { "type": "string", "pattern": "^KSM-FP-[0-9]{4,}$" },
+    "summary": { "type": "string" },
+    "indicators": {
+      "type": "array",
+      "description": "Qualitative field indicators observed (never asserted mineral value).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "signal": { "type": "string", "enum": ["present", "absent", "uncertain"] },
+          "source": { "type": "string", "enum": ["photo", "voice", "location", "base_knowledge", "fused"] }
+        }
+      },
+      "default": []
+    },
+    "confidence": { "type": "string", "enum": ["low", "medium", "high"], "default": "low" },
+    "recommended_next_step": { "type": ["string", "null"], "default": null },
+    "ai_limitations": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "needs_human_review": { "type": "boolean", "default": true },
+    "sensitivity_level": {
+      "type": "string",
+      "enum": ["PUBLIC", "PARTNER", "INTERNAL", "RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"],
+      "default": "INTERNAL"
+    }
+  }
+}

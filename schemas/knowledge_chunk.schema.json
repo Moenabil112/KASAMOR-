@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/knowledge_chunk.schema.json",
+  "title": "KASAMOR Knowledge Chunk",
+  "description": "A single RAG-ready chunk extracted from the base knowledge package.",
+  "type": "object",
+  "required": ["chunk_id", "source_file", "content", "sensitivity_level"],
+  "additionalProperties": false,
+  "properties": {
+    "chunk_id": { "type": "string", "pattern": "^KSM-KB-[0-9]{4,}$" },
+    "source_file": { "type": "string" },
+    "document_type": {
+      "type": "string",
+      "description": "e.g. master_concept, academic_blueprint, field_protocol, governance, economic, risk, partner_brief, geospatial."
+    },
+    "section_title": { "type": ["string", "null"] },
+    "content": { "type": "string" },
+    "sensitivity_level": {
+      "type": "string",
+      "enum": ["PUBLIC", "PARTNER", "INTERNAL", "RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"]
+    },
+    "knowledge_domain": {
+      "type": "string",
+      "enum": ["concept", "academic", "field", "technical", "governance", "economic", "risk", "partner", "geospatial"]
+    },
+    "token_estimate": { "type": ["integer", "null"], "default": null },
+    "created_at": { "type": ["string", "null"] },
+    "needs_human_review": { "type": "boolean", "default": false }
+  }
+}

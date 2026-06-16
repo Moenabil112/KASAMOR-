@@ -1,0 +1,36 @@
+{
+  "field_packet_id": "KSM-FP-0001",
+  "contributor_code": "FIELD-001",
+  "location": {
+    "lat": 14.5946,
+    "lon": 35.4566,
+    "accuracy_m": 8,
+    "sensitivity_level": "RESTRICTED"
+  },
+  "place_label": "Seasonal drainage sector near study-area ridge",
+  "observation_date": "2026-05-12",
+  "seasonal_context": "after_rain",
+  "photos": ["KSM-PH-0001", "KSM-PH-0002", "KSM-PH-0003"],
+  "voice_notes": ["KSM-VN-0001"],
+  "local_notes": [
+    "Water flows strongly here for a few days after heavy rain, then dries.",
+    "Elders call this stretch the dark-sand bend."
+  ],
+  "sediment_observations": [
+    "Dark heavy sand collects in the inner bend of the channel after flow.",
+    "Lighter sand washes downstream; darker grains remain in traps."
+  ],
+  "rock_observations": [
+    "White quartz-like fragments scattered along the upstream slope.",
+    "Cracked bedrock exposed where water cuts the bank."
+  ],
+  "water_drainage_observations": [
+    "Single seasonal channel draining the ridge toward the lowland.",
+    "Flow concentrates against the rock shelf on the eastern side."
+  ],
+  "observation_tags": ["black_sand", "quartz_context", "seasonal_drainage", "after_rain"],
+  "ai_summary": null,
+  "review_status": "pending",
+  "review_decision": null,
+  "created_at": "2026-05-12T09:40:00Z"
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "photo_id": "KSM-PH-0001",
+    "field_packet_id": "KSM-FP-0001",
+    "photo_type": "site_context",
+    "quality_status": "accepted",
+    "quality_notes": ["Clear wide view of the drainage sector."],
+    "has_reference_scale": false,
+    "has_gps": true,
+    "is_blurry": false,
+    "lighting_condition": "good",
+    "ai_confidence": "medium",
+    "sensitivity_level": "RESTRICTED"
+  },
+  {
+    "photo_id": "KSM-PH-0002",
+    "field_packet_id": "KSM-FP-0001",
+    "photo_type": "sediment_closeup",
+    "quality_status": "needs_retake",
+    "quality_notes": ["No reference scale in frame.", "Slightly soft focus."],
+    "has_reference_scale": false,
+    "has_gps": true,
+    "is_blurry": true,
+    "lighting_condition": "good",
+    "ai_confidence": "low",
+    "sensitivity_level": "RESTRICTED"
+  },
+  {
+    "photo_id": "KSM-PH-0003",
+    "field_packet_id": "KSM-FP-0001",
+    "photo_type": "black_sand_closeup",
+    "quality_status": "documentation_only",
+    "quality_notes": ["Useful for documentation; not suitable for measurement."],
+    "has_reference_scale": false,
+    "has_gps": false,
+    "is_blurry": false,
+    "lighting_condition": "unknown",
+    "ai_confidence": "low",
+    "sensitivity_level": "RESTRICTED"
+  }
+]

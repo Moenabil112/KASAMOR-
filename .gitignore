@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# KASAMOR generated artifacts (keep directories, ignore extracted/generated content)
+data/base-knowledge/*
+!data/base-knowledge/.gitkeep
+data/extracted-knowledge/*
+!data/extracted-knowledge/.gitkeep
+data/outputs/reports/*
+!data/outputs/reports/.gitkeep
+data/media/*.jpg
+data/media/*.png
+data/media/*.m4a
+data/media/*.wav
+
+# But keep curated sample data committed
+!data/field-packets/*.json
+!data/media/*.json
+!data/review/*.json

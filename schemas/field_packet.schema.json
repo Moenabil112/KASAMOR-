@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kasamor.org/schemas/field_packet.schema.json",
+  "title": "KASAMOR Field Packet",
+  "description": "One structured rural observation package contributed from the field.",
+  "type": "object",
+  "required": ["field_packet_id", "contributor_code", "review_status"],
+  "additionalProperties": false,
+  "properties": {
+    "field_packet_id": {
+      "type": "string",
+      "pattern": "^KSM-FP-[0-9]{4,}$",
+      "description": "Stable identifier, e.g. KSM-FP-0001."
+    },
+    "contributor_code": {
+      "type": "string",
+      "description": "Anonymous contributor code, never a real personal identity."
+    },
+    "location": {
+      "type": "object",
+      "description": "Geospatial position. Always treated as RESTRICTED and never exposed publicly.",
+      "additionalProperties": false,
+      "properties": {
+        "lat": { "type": ["number", "null"] },
+        "lon": { "type": ["number", "null"] },
+        "accuracy_m": { "type": ["number", "null"] },
+        "sensitivity_level": {
+          "type": "string",
+          "enum": ["PUBLIC", "PARTNER", "INTERNAL", "RESTRICTED", "HOUSE_OF_EARTH_TRUST_ONLY"],
+          "default": "RESTRICTED"
+        }
+      }
+    },
+    "place_label": {
+      "type": ["string", "null"],
+      "description": "General place name or observation sector. Not precise coordinates."
+    },
+    "observation_date": {
+      "type": ["string", "null"],
+      "description": "ISO date YYYY-MM-DD."
+    },
+    "seasonal_context": {
+      "type": "string",
+      "enum": ["before_rain", "during_rain", "after_rain", "dry_season", "unknown"],
+      "default": "unknown"
+    },
+    "photos": {
+      "type": "array",
+      "items": { "type": "string", "description": "Photo reference id, e.g. KSM-PH-0001." },
+      "default": []
+    },
+    "voice_notes": {
+      "type": "array",
+      "items": { "type": "string", "description": "Voice note reference id, e.g. KSM-VN-0001." },
+      "default": []
+    },
+    "local_notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "sediment_observations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "rock_observations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "water_drainage_observations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "observation_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "ai_summary": {
+      "type": ["string", "null"],
+      "description": "AI-generated observation summary. Never a confirmed mineral claim."
+    },
+    "review_status": {
+      "type": "string",
+      "enum": ["pending", "in_review", "decided"],
+      "default": "pending"
+    },
+    "review_decision": {
+      "type": ["string", "null"],
+      "enum": ["accepted", "needs_more_photos", "needs_field_revisit", "needs_sample", "low_priority", "rejected", null]
+    },
+    "created_at": { "type": ["string", "null"] }
+  }
+}
