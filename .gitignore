@@ -23,6 +23,12 @@ data/extracted-knowledge/*
 !data/extracted-knowledge/.gitkeep
 data/outputs/reports/*
 !data/outputs/reports/.gitkeep
+
+# Restricted geospatial storage: raw GeoJSON/KML with exact coordinates.
+# These are preserved locally only and must NEVER be committed or exposed.
+data/geo/*
+!data/geo/.gitkeep
+
 data/media/*.jpg
 data/media/*.png
 data/media/*.m4a
